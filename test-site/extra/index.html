@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head>
+  <title>Extra rules</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
+  <style>p { color: teal }</style>
+</head>
+<body>
+  <p>Every linked file counts, not only pages.</p>
+  <img src="logo.png" alt="attributes are not words">
+  <a href="docs">Docs without a trailing slash (the server redirects it)</a>
+  <a href="docs/"></a><!-- the redirect target, linked directly too: must still count once -->
+  <a href="page.html?p=2">Page two</a>
+  <a href="page.html?p=2#top">Page two again, with a fragment</a>
+  <a href="page.html">Page without a query</a>
+  <a href="../index.html">Outside this base path</a>
+  <a href="nope.html">Broken</a>
+  <a href="mailto:someone@example.com">Mail</a>
+  <script>var notCounted = "these words are inside a script";</script>
+</body></html>

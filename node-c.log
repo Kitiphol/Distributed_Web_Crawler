@@ -1,0 +1,23 @@
+node 60f361f4 started with 10 worker loops, Redis at redis://127.0.0.1:6379 (Ctrl+C to stop)
+[60f361f4 loop 9] job 0001  file html  https://doc.rust-lang.org/std/fs/struct.File.html  +83 links
+[60f361f4 loop 0] job 0001  file html  https://doc.rust-lang.org/std/macro.format.html  +9 links
+[60f361f4 loop 1] job 0001  file html  https://doc.rust-lang.org/std/str/trait.FromStr.html  +42 links
+[60f361f4 loop 2] job 0001  file html  https://doc.rust-lang.org/std/rc/struct.Rc.html  +100 links
+[60f361f4 loop 3] job 0001  file html  https://doc.rust-lang.org/std/cell/struct.Cell.html  +51 links
+[60f361f4 loop 4] job 0001  file html  https://doc.rust-lang.org/std/cell/struct.RefCell.html  +49 links
+[60f361f4 loop 6] job 0001  file html  https://doc.rust-lang.org/std/sync/struct.Mutex.html  +42 links
+[60f361f4 loop 7] job 0001  file html  https://doc.rust-lang.org/std/collections/index.html  +23 links
+[60f361f4 loop 8] job 0001  file html  https://doc.rust-lang.org/std/collections/struct.HashMap.html  +66 links
+[60f361f4 loop 5] job 0001  file html  https://doc.rust-lang.org/std/sync/struct.Arc.html  +123 links
+[60f361f4 loop 9] job 0001  file html  https://doc.rust-lang.org/std/sync/index.html  +38 links
+[60f361f4 loop 1] job 0001  file html  https://doc.rust-lang.org/std/sync/mpsc/index.html  +17 links
+[60f361f4 loop 0] job 0001  file html  https://doc.rust-lang.org/std/sync/atomic/index.html  +27 links
+[60f361f4 loop 2] job 0001  file html  https://doc.rust-lang.org/std/primitive.bool.html  +86 links
+[60f361f4 loop 3] job 0001  file html  https://doc.rust-lang.org/std/primitive.fn.html  +56 links
+[60f361f4 loop 8] job 0001  file html  https://doc.rust-lang.org/std/primitive.never.html  +56 links
+[60f361f4 loop 5] job 0001  file html  https://doc.rust-lang.org/std/alloc/index.html  +21 links
+[60f361f4 loop 9] job 0001  file html  https://doc.rust-lang.org/std/any/index.html  +10 links
+[60f361f4 loop 1] job 0001  file html  https://doc.rust-lang.org/std/arch/index.html  +12 links
+[60f361f4 loop 0] job 0001  file html  https://doc.rust-lang.org/std/array/index.html  +10 links
+[60f361f4 loop 2] job 0001  file html  https://doc.rust-lang.org/std/borrow/index.html  +6 links
+[60f361f4 loop 3] job 0001  file html  https://doc.rust-lang.org/std/cell/index.html  +25 links

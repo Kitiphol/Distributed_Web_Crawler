@@ -1,0 +1,23 @@
+[package]
+name = "crawl"
+version = "1.0.0"
+edition = "2021"
+description = "A distributed web crawler coordinated through Redis (Mini 1)"
+
+[dependencies]
+# Async runtime: tasks, timers, signals
+tokio = { version = "1", features = ["full"] }
+# Async HTTP client (rustls: no system OpenSSL needed). Never use the `blocking` feature.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset", "http2"] }
+# Redis client with Tokio support (MultiplexedConnection, Script)
+redis = { version = "0.27", features = ["tokio-comp"] }
+# HTML parsing for links and text
+scraper = "0.20"
+# URL parsing, resolving relative links, removing fragments
+url = "2"
+# Command-line subcommands and flags
+clap = { version = "4", features = ["derive", "env"] }
+# Error handling with `?` and context messages
+anyhow = "1"
+# Shuffling job order and generating node IDs
+fastrand = "2"

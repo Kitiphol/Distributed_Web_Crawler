@@ -1,0 +1,16 @@
+# Start Redis for the crawler cluster:   docker compose up -d
+# Stop it:                               docker compose down      (add -v to delete the data)
+services:
+  redis:
+    image: redis:7
+    container_name: crawl-redis
+    ports:
+      - "6379:6379"
+    # Append-only file: job stats survive a Redis restart until you clear them.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+      - ./scripts:/scripts:ro   # lets `docker compose exec redis bash /scripts/test_scripts.sh` run the script tests
+
+volumes:
+  redis-data:
