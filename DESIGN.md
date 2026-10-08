@@ -29,7 +29,7 @@ The requirements that shape the design:
 | Same `WebStats` for any number of nodes N | Nothing may depend on timing, luck, or N (§5.3, §5.9) |
 | The cluster detects completion on its own | An exact "work left" count (§5.4) |
 | Several jobs at once, without interfering | Per-job state and fair scheduling (§5.1, §5.7) |
-| At most 10 requests in flight per node | 10 worker loops, one URL each (§5.8) |
+| At most 10 requests in flight per node | 10 worker loops, one URL each |
 | The CLI talks only to Redis; nodes can run on any machine | Everything shared lives in Redis (§2) |
 | Extra challenge: a node can be killed mid-crawl, every page still counted exactly once | Crash recovery (§5.5, §5.6) |
 
@@ -245,22 +245,8 @@ coordination between loops or nodes.
 
 Scheduling affects only speed and order, never the results.
 
-### 5.8 Concurrency inside a node: 10 loops on one thread
 
-**Chosen:** a single-threaded Tokio runtime with 10 worker loops. Each loop handles one URL
-at a time, so at most 10 requests are in flight by construction. Tasks switch at every
-`.await` that has to wait, which is where the concurrency comes from.
-
-| Alternative | Why it was not chosen |
-| --- | --- |
-| Spawn a task per URL, limited by a semaphore | Also works, but the limit becomes a separate mechanism, and there is no fixed set of slots to name the processing lists after |
-| Multi-threaded runtime | The work is mostly waiting on the network, so one thread is enough, and it avoids `Send` requirements (the HTML parser's document type is not `Send`) |
-
-**Rule that follows:** never block the thread (no `std::thread::sleep`, no blocking HTTP or
-Redis calls). The heartbeat shares the thread; if it were starved for 10 s, the node would
-be treated as dead.
-
-### 5.9 Fetching
+### 5.8 Fetching
 
 - **HEAD first, GET only for HTML.** Non-HTML files only need to be counted, not downloaded.
 - **Redirects are not followed.** The target is treated as a new link, so it goes through
