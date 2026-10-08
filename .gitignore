@@ -1,4 +1,6 @@
 /target
 /test-big
 dump.rdb
-
+/docs
+node*.log
+CLAUDE.md

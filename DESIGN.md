@@ -163,7 +163,6 @@ command inside them errors, so they must be written and tested carefully.
 | `SISMEMBER k m`, `SCARD k`, `SMEMBERS k`, `SREM k m` | set | Test / size / all / remove | 1 or 0 / number / members / 1 or 0 |
 | `HSET k f v ...`, `HGET k f`, `HGETALL k` | hash | Write / read field / read all | count / value / pairs |
 | `HINCRBY k f n`, `HLEN k`, `HDEL k f` | hash | Add to a field / number of fields / delete field | new value / number / 1 or 0 |
-| `MULTI` ... `EXEC` | any | Queue commands, run them as one block | all results |
 
 Empty lists, sets and hashes are deleted automatically by Redis.
 
@@ -212,6 +211,23 @@ How similar-looking keys differ:
 3. `stats.crawled == SCARD finished`.
 4. A job is in `jobs:active` exactly while `pending > 0`; `meta.status == "done"` exactly when `pending == 0`.
 5. Each processing list holds 0 or 1 items.
+
+
+### 6.4 Deduplication: alternatives considered
+
+**Chosen:** one `job:{id}:seen` set in Redis holding full URLs. It is exact, shared by every
+node, and survives any node crash. Its cost is memory proportional to the number of URLs,
+which is small for one site.
+
+| Alternative | Idea | Why it was not chosen |
+| --- | --- | --- |
+| Bloom filter (shared, or one per worker) | Store a few bits per URL instead of the URL | It is approximate: it sometimes reports a new URL as seen, and that page is then never crawled. Stats would be slightly wrong, and wrong differently for different N, breaking R12. Its benefit is memory, which matters when crawling many sites, not one. |
+| A local set per worker, with URLs routed by hash | `hash(url)` decides which worker owns a URL, so the owner's local set is enough | A dead worker's set is in its memory and is lost, and its slice of URLs stalls, which breaks crash recovery (R18). It needs a queue per node and routing instead of the pull model, and changing N remaps URLs. Consistent hashing with virtual nodes evens out URL counts, but not work: pages differ in cost, and an idle worker cannot take URLs from another worker's slice. |
+| A local cache in front of `seen` | Each node remembers URLs it knows are seen and does not send them to Redis again | Tested and rejected. After Redis was taken down and brought back with its data cleared, a newly submitted job reused a job ID, and the node skipped its URLs because its in-memory cache still listed them as seen. Clearing the cache when the Redis connection drops would fix it, but the gain does not justify the extra state: children already travel in one batch per page (§7.3), so the cache saves no round trips. |
+| Storing 128-bit hashes instead of URLs | `seen` holds a fixed-size hash of each URL; one `hash -> status` map could replace both `seen` and `finished` | Exact in practice (a collision among a billion URLs has a probability of about 1 in 10^21) and smaller than full URLs, but not needed at this scale. The sets would no longer be readable in `redis-cli`, and every node must use the same fixed hash function (Rust's default hasher is seeded per process). Listed as a possible extension (§18). |
+
+A local set per worker **without** routing was not considered: two workers could both see
+the same URL as new and both crawl and count it.
 
 ## 7. Lua scripts (full code)
 
@@ -377,6 +393,34 @@ if redis.call('SISMEMBER', 'job:' .. id .. ':finished', url) == 0 then
 end
 return item
 ```
+
+### 7.5 Why Lua scripts, and not the alternatives
+
+The hardest operation is step 3 of `finish.lua`: `SADD seen <child>`, and **only if that
+returned 1**, `INCRBY pending` and `RPUSH queue`. A multi-step update like this can break in
+two ways:
+
+- **Interleaving**: another worker's command runs between the steps and sees or changes a
+  half-done state (e.g. `pending` reaching 0 while a claimed child is not yet counted).
+- **Crash**: the worker dies between the steps (e.g. after `SADD`, before `RPUSH`), leaving
+  a URL claimed forever and never crawled.
+
+A Lua script prevents both (Redis runs it as one command, and it cannot stop halfway once
+received), can branch on results in the middle, and costs one round trip.
+
+| Alternative | How it works | Why it was not chosen |
+| --- | --- | --- |
+| `MULTI` / `EXEC` | Queues commands and runs them as one block | Atomic, and one round trip when pipelined, but the commands are only queued: no result is visible until `EXEC`, so "only if `SADD` returned 1" cannot be expressed. Used here only for read-only snapshots (§9.7). |
+| `WATCH` + `MULTI` | Read, decide in Rust, then `EXEC`, which aborts if a watched key changed | Correct, but every loop on every node writes `seen`, so transactions would abort and retry constantly, more so with more nodes. At least two round trips per attempt. `WATCH` is per connection, so each loop would need its own connection instead of the shared `MultiplexedConnection`. |
+| Distributed lock | `SET lock NX PX`, run the steps, release | About five round trips per operation, and every worker on a job waits for the same lock. It stops interleaving but not crashes: a node killed after `SADD` leaves the child claimed and never queued; the lock expires, the half-done state stays. A slow holder can also outlive the lock's expiry, and releasing safely needs a script anyway. |
+| Idempotent design (no claims) | Push every link unchecked, drop duplicates when taking, store one result per URL, compute stats at the end | Needs no atomicity, since every step is safe to repeat. But the queue holds one copy of a URL for every page that links to it, stats are no longer live counters, and there is no exact `pending` count, so detecting completion needs a different mechanism. |
+
+One idea from the idempotent design is kept: reporting a URL twice is harmless (`finished`
+set, step 2 of `finish.lua`), which is what crash recovery relies on.
+
+The cost of Lua: a second language to maintain, and no rollback if a script hits a runtime
+error part-way (§5, §18), so the scripts are kept short and are tested by
+`scripts/test_scripts.sh`.
 
 Safe with several reapers at once: `LPOP` hands the item to exactly one of them.
 
@@ -799,17 +843,7 @@ still equal; logs show a `-1` duplicate.
 7. Corner-case decisions (§10) with reasons.
 8. Testing: how to run unit tests, script tests, the same-answer and crash tests.
 
-## 17. Hand-in checklist
-
-- [ ] Private GitHub repo; meaningful commits; feature branches merged into main.
-- [ ] `docker-compose.yml` and the one-line `docker run` in the README.
-- [ ] README per §16.
-- [ ] `cargo fmt`, `cargo clippy` clean; `cargo test` passes.
-- [ ] Same-answer, multi-job and crash tests done.
-- [ ] Tag `1.0.0`; submit the repo URL on the LMS.
-- [ ] Live demo with several nodes plus the CLI; make the repo public afterwards.
-
-## 18. Known limitations and possible extensions
+## 17. Known limitations and possible extensions
 
 - Words split across inline tags (`Hel<b>lo</b>`) count as two words, since each text node is counted separately.
 - Taking is polling-based (scripts can't block): up to ~500 ms pickup latency when idle.

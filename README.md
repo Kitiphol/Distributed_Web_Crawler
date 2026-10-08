@@ -48,6 +48,48 @@ crawl node
 Add `-q` to hide the per-page log. Stop a node with Ctrl+C: it finishes the pages it's working
 on and leaves the cluster.
 
+### 4.1 Why there is no monitor or scheduler service
+
+Three ways to detect dead nodes and recover their URLs were considered:
+
+- **A. Central monitor/scheduler**: one extra process watches heartbeats, requeues dead
+  nodes' URLs, and possibly assigns work to nodes.
+- **B. Per-node (chosen)**: every node refreshes its own heartbeat and runs its own reaper;
+  nodes pull work themselves.
+- **C. Distributed monitor/scheduler**: several monitor replicas elect one leader to do the
+  job; another takes over if the leader dies.
+
+| | A. Central | B. Per-node (chosen) | C. Distributed |
+| --- | --- | --- | --- |
+| Single point of failure | Yes: if it dies, nothing is recovered (and nothing is crawled, if it also assigns work) | No: any surviving node recovers | No |
+| Extra processes to run | One | None | Several, plus leader election |
+| Recovery logic | One place, no duplicate work | In every node; must be safe when several reapers act at once | One leader; must still be safe during a leader change |
+| Global view for scheduling | Yes | No | Yes |
+| Monitoring cost | One scan per interval | One scan per node per interval | One scan per interval |
+| Per-URL overhead | An extra hop if it assigns every URL | None: nodes pull directly | Same as A |
+| Complexity | Low | Low to medium | High |
+
+**Why B.** A and C buy a global view of the cluster, which allows smarter scheduling
+(priorities, load balancing, per-site rate limits). This crawler does not need it: fairness
+is a random shuffle that each loop can do alone (§13). B works because of two properties the
+design already has:
+
+- Redis does the failure detection: a heartbeat key expires by itself (§9.4).
+- `requeue.lua` is atomic (§7.4), so several reapers recovering the same dead node can
+  neither lose nor duplicate a URL.
+
+B is in effect C without the election: every node is a monitor, and instead of choosing one
+to act, the action is made safe for all of them to take at once. A coordinator would add a
+point of failure without adding correctness.
+
+**Costs of B.** Every node scans every other node, so monitoring work grows with the square
+of the node count (negligible at this scale). Scheduling is limited to what each loop can
+decide locally. If every node is dead, nothing is recovered until a node starts again.
+
+**The same in all three.** Recovery time is set by the heartbeat TTL plus the reaper
+interval (about 10 to 15 s, §14), not by who does the scanning. Redis is a single point of
+failure in every option; its failure is out of scope (§3).
+
 ### 5. Use the CLI
 Submit one or more URLs. Each becomes a job:
 ```
