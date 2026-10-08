@@ -8,11 +8,9 @@ One binary provides both the nodes and the command-line tool.
 Nodes can be killed mid-crawl (or frozen and resumed): the job still finishes, and every
 page is counted exactly once.
 
-## Quick start
 
-### Prerequisites
-- Rust (stable), via [rustup](https://rustup.rs)
-- Docker (Docker Desktop on macOS/Windows, Docker Engine on Linux)
+
+### Note: Read DESIGN.md to understand the choices made
 
 ### 1. Start Redis
 ```bash
