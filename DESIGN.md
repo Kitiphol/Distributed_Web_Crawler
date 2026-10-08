@@ -235,8 +235,10 @@ remains a single point of failure.
 ### 5.7 Fairness between jobs: shuffle on every take
 
 **Chosen:** before each take, the loop shuffles the list of active jobs; `take.lua` uses the
-first non-empty queue. Each job with waiting URLs gets an equal share on average, with no
-coordination between loops or nodes.
+first non-empty queue. 
+
+Each job with waiting URLs gets an equal share on average, with no
+coordination between loops or nodes -- making everyhting more fair and random for each 'submit url' being processed
 
 | Alternative | Why it was not chosen |
 | --- | --- |
